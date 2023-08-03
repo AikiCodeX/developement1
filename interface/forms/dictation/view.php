@@ -25,7 +25,25 @@ $returnurl = 'encounter_top.php';
 <html>
 <head>
     <title><?php echo xlt("Dictation"); ?></title>
+    <style>
+    .textbox-container {
+        position: relative;
+    }
 
+    #dictation-textarea {
+        padding-right: 30px; /* Provide some space for the button on the right */
+    }
+
+    #mic-btn {
+        position: absolute;
+        top: 5px;
+        right: 5px;
+        font-size: 18px;
+        background-color: transparent;
+        border: none;
+        cursor: pointer;
+    }
+    </style>
     <?php Header::setupHeader();?>
 </head>
 <body class="body_top">
@@ -46,7 +64,12 @@ $obj = formFetch("form_dictation", $_GET["id"]);
                     <legend class=""><?php echo xlt('Dictation')?></legend>
                     <div class="form-group">
                         <div class="col-sm-10 offset-sm-1">
-                            <textarea name="dictation" class="form-control" cols="80" rows="15" ><?php echo text($obj["dictation"]);?></textarea>
+                            <div style="position: relative;">
+                            <textarea name="dictation" id="dictation-textarea" class="form-control" cols="80" rows="15" ><?php echo text($obj["dictation"]);?></textarea>
+                                <button id="mic-btn" onclick="event.preventDefault(); toggleRecording()">
+                                    🎤
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </fieldset>
@@ -66,6 +89,57 @@ $obj = formFetch("form_dictation", $_GET["id"]);
                         </div>
                     </div>
                 </div>
+                <script>
+                            let isRecording = false;
+                            let mediaRecorder;
+                            let recordedChunks = [];
+
+                            function toggleRecording() {
+                                if (isRecording) {
+                                    stopRecording();
+                                } else {
+                                    startRecording();
+                                }
+                            }
+                            function startRecording() {
+                                if (!isRecording) {
+                                    navigator.mediaDevices.getUserMedia({ audio: true })
+                                        .then(function (stream) {
+                                            isRecording = true;
+                                            recordedChunks = [];
+                                            mediaRecorder = new MediaRecorder(stream);
+
+                                            mediaRecorder.ondataavailable = function (event) {
+                                                if (event.data.size > 0) {
+                                                    recordedChunks.push(event.data);
+                                                }
+                                            };
+
+                                            mediaRecorder.onstop = function () {
+                                                isRecording = false;
+                                                const blob = new Blob(recordedChunks, { type: 'audio/webm' });
+                                                const audioURL = URL.createObjectURL(blob);
+                                                const textarea = document.getElementById('dictation-textarea');
+                                                textarea.value += `\n[Audio Recording]\n${audioURL}\n[/Audio Recording]\n`;
+                                                recordedChunks = [];
+                                            };
+
+                                            mediaRecorder.start();
+                                            document.getElementById('mic-btn').innerText = '🎤 Stop';
+                                        })
+                                        .catch(function (error) {
+                                            console.error('Error accessing the microphone:', error);
+                                        });
+                                }
+                            }
+
+                            function stopRecording() {
+                                if (mediaRecorder && isRecording) {
+                                    mediaRecorder.stop();
+                                    document.getElementById('mic-btn').innerText = '🎤';
+                                }
+                            }
+                    </script>
             </form>
         </div>
     </div>

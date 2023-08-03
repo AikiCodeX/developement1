@@ -1,0 +1,1 @@
+get sent to OpenAI and you get transcribed into text.

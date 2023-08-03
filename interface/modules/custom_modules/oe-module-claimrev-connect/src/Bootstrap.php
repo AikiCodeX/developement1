@@ -124,7 +124,7 @@ class Bootstrap
         global $GLOBALS;
 
         $service = $event->getGlobalsService();
-        $section = xlt("ClaimRev Connect");
+        $section = xlt("Xenith Connect");
         $service->createSection($section, 'Portal');
 
         $settings = $this->globalsConfig->getGlobalSettingSectionConfiguration();
@@ -262,7 +262,7 @@ class Bootstrap
         $menuItem->requirement = 0;
         $menuItem->target = 'mod';
         $menuItem->menu_id = 'mod0';
-        $menuItem->label = xlt("ClaimRev Connect");
+        $menuItem->label = xlt("Xenith Connect");
         // TODO: pull the install location into a constant into the codebase so if OpenEMR changes this location it
         // doesn't break any modules.
         $menuItem->url = "/interface/modules/custom_modules/oe-module-claimrev-connect/public/index.php";

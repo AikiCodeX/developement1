@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+    <body>
+    <object id="mic-svg" data="microphone-svgrepo-com(1).svg" type="image/svg+xml" onclick="toggleBlink()"></object>
+        
+    <style>
+      @keyframes blink {
+        0% { fill: currentColor; }
+        50% { fill: red; }
+        100% { fill: currentColor; }
+      }
+      mic-svg {
+        color: red;
+      }
+    </style>
+    
+    <script>
+      function toggleBlink() {
+        let svgDocument = document.getElementById("mic-svg").contentDocument;
+        let svgElements = svgDocument.querySelectorAll("path"); // or whatever selector matches your SVG elements
+    
+        svgElements.forEach((svgElement) => {
+          svgElement.style.animation = svgElement.style.animation ? "" : "blink 1s infinite";
+        });
+      }
+    </script>
+    </body>
+</html>

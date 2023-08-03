@@ -28,8 +28,8 @@
 // +------------------------------------------------------------------------------+
 
 require_once("../../interface/globals.php");
-require_once("$srcdir/lists.inc.php");
-require_once("$srcdir/user.inc.php");
+require_once("$srcdir/lists.inc");
+require_once("$srcdir/user.inc");
 
 use OpenEMR\Core\Header;
 use OpenEMR\Common\Csrf\CsrfUtils;
@@ -229,8 +229,8 @@ if (empty($isNN) && empty($rowContext)) {
                 while ($row = sqlFetchArray($res)) { ?>
                     <a href="#" onclick="top.restoreSession();CKEDITOR.instances.textarea1.insertText('<?php echo $row['cl_list_item_short']; ?>');" class="btn btn-primary" title="<?php echo htmlspecialchars(xl($row['cl_list_item_long']), ENT_QUOTES); ?>"><?php echo ucfirst(htmlspecialchars(xl($row['cl_list_item_long']), ENT_QUOTES)); ?></a>
                 <?php } ?>
-                  <a class="btn btn-primary btn-sm btn-transmit float-right" href="#" onclick="return SelectToSave(<?php echo attr_js($type); ?>, <?php echo attr_js($cc_flag); ?>)"><?php echo xlt('Insert in Form'); ?></a>
-              </div>
+                <a href="#" id="chat" onclick="runPythonScriptAndInsertText('general');" class="btn btn-primary float-right" title="<?php echo htmlspecialchars(xl('Give AI a prompt to repond to')); ?>"><?php echo ('AI Generate'); ?> </a>
+            </div>
               <div class="col-md-4">
                 <div class="bg-light">
                     <div style="overflow-y: scroll; overflow-x: hidden; height: 400px">
@@ -238,6 +238,11 @@ if (empty($isNN) && empty($rowContext)) {
                             <li>
                                 <a class="expanded"><?php echo htmlspecialchars(xl('Components'), ENT_QUOTES); ?></a>
                                 <ul>
+                                    <a href="#" id="quest" onclick="chatCall('subjective');" title="<?php echo htmlspecialchars(xl('Subjective note of the appointment')); ?>"><?php echo ('Subjective AI'); ?><i ></i></a>
+                                    <a href="#" id="quest" onclick="chatCall('objective', undefined);" title="<?php echo htmlspecialchars(xl('Objective note of the appointment')); ?>"><?php echo ('Objective AI'); ?><i ></i></a>
+                                    <a href="#" id="quest" onclick="chatCall('diagnosis',undefined);" title="<?php echo htmlspecialchars(xl('Assesment note of the appointment')); ?>"><?php echo ('Diagnosis AI'); ?><i ></i></a>
+                                    <a href="#" id="quest" onclick="chatCall('plan', undefined);" title="<?php echo htmlspecialchars(xl('Plan note of the appointment')); ?>"><?php echo ('Plan AI'); ?><i ></i></a>
+
                                     <div id="template_sentence"></div>
                                 </ul>
                             </li>
@@ -299,8 +304,68 @@ if (empty($isNN) && empty($rowContext)) {
       exit();
   }
     ?>
+    <?php 
+                $query = "SELECT MAX(form_id) as max_form_id FROM forms WHERE formdir = 'dictation' AND encounter = ?";
+                $result = sqlQuery($query, array($encounter));
+                $transcript_query = "SELECT dictation FROM form_dictation WHERE id = ?";
+                $transcript_result = sqlQuery($transcript_query, array($result['max_form_id']));
+                $api = 'AKIAIOSFODNN7EXAMPLE';
+
+            ?>
+
   <table>
-      <script>
+      
+
+  <script>
+    try {
+        var transcript = <?php echo json_encode($transcript_result['dictation']); ?>;
+        
+        function chatCall(buttonName) {
+            if (!buttonName) {
+                console.error("Invalid button name: ", buttonName);
+                return;
+            }
+
+            if (transcript) {
+                console.log("Transcript Found");
+                var websocket = new WebSocket('ws://localhost:5050');
+
+                websocket.onerror = function(event) {
+                    console.error("WebSocket error observed:", event);
+                };
+
+                websocket.onclose = function(event) {
+                    console.log("WebSocket is closed now.", event);
+                };
+
+                let message = {
+                    "system": "You are a medical scribe that makes SOAP notes",
+                    "user": "Write the " + buttonName + " part of the SOAP note based on the following transcript: '" + transcript + "' between the doctor and patient",
+                    "apiKey": "<?php echo $api; ?>"
+                };
+                
+                websocket.onopen = function(event) {
+                    websocket.send(JSON.stringify(message));
+                };
+                
+                websocket.onmessage = function (event) {
+                    if (CKEDITOR.instances.textarea1) {
+                        CKEDITOR.instances.textarea1.insertText(event.data);
+                    } else {
+                        console.error("CKEditor instance textarea1 does not exist.");
+                    }
+                };
+            } else {
+                console.log("No Transcript for this encounter");
+            }
+        }
+    } catch (error) {
+        console.error("An error occurred: ", error);
+    }
+</script>
+
+           
+               
           <?php if (!$isNN) { ?>
               CKEDITOR.on('instanceReady', function(){$("#cke_1_toolbar_collapser").click();});
           <?php } ?>

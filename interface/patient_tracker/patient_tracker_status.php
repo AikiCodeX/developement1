@@ -89,6 +89,7 @@ if (!empty($_POST['statustype'])) {
     echo " window.opener.document.flb.submit();\n";
     echo " dlgclose();\n";
     echo "</script></body></html>\n";
+  
     exit();
 }
 
@@ -101,7 +102,7 @@ $row = sqlQuery("select fname, lname " .
     <div class="container mt-3">
         <div class="row">
             <div class="col-12">
-                <h2><?php echo xlt('Change Status for') . " " . text($row['fname']) . " " . text($row['lname']); ?></h2>
+                <h2><?php echo xlt('Change Status for') . " " . text($row['fname']) . " " . text($row['lname']) . " " . text($srcdir); ?></h2>
             </div>
         </div>
         <form id="form_note" method="post" action="patient_tracker_status.php?tracker_id=<?php echo attr_url($tracker_id) ?>&csrf_token_form=<?php echo attr_url(CsrfUtils::collectCsrfToken()); ?>" enctype="multipart/form-data" >

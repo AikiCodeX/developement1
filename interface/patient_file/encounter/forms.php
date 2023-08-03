@@ -13,9 +13,9 @@
  */
 
 require_once(__DIR__ . "/../../globals.php");
-require_once("$srcdir/encounter.inc.php");
-require_once("$srcdir/group.inc.php");
-require_once("$srcdir/patient.inc.php");
+require_once("$srcdir/encounter.inc");
+require_once("$srcdir/group.inc");
+require_once("$srcdir/patient.inc");
 require_once("$srcdir/amc.php");
 require_once($GLOBALS['srcdir'] . '/ESign/Api.php');
 require_once("$srcdir/../controllers/C_Document.class.php");
@@ -29,7 +29,6 @@ use OpenEMR\Events\Encounter\EncounterMenuEvent;
 use OpenEMR\Services\EncounterService;
 use OpenEMR\Services\UserService;
 use Symfony\Component\EventDispatcher\EventDispatcher;
-use OpenEMR\Events\Encounter\EncounterFormsListRenderEvent;
 
 $expand_default = (int)$GLOBALS['expand_form'] ? 'show' : 'hide';
 $reviewMode = false;
@@ -62,10 +61,10 @@ if ($GLOBALS['kernel']->getEventDispatcher() instanceof EventDispatcher) {
 <html>
 
 <head>
-
+<script src="https://cdn.rawgit.com/mattdiamond/Recorderjs/08e7abd9/dist/recorder.js"></script>
 <?php require $GLOBALS['srcdir'] . '/js/xl/dygraphs.js.php'; ?>
 
-<?php Header::setupHeader(['common','esign','dygraphs', 'utility']); ?>
+<?php Header::setupHeader(['common','esign','dygraphs']); ?>
 
 <?php
 $esignApi = new Api();
@@ -261,7 +260,7 @@ $(function () {
      $(".deleteme").click(function(evt) { deleteme(); evt.stopPropogation(); });
 
 <?php
- // If the user was not just asked about orphaned orders, build javascript for that.
+  // If the user was not just asked about orphaned orders, build javascript for that.
 if (!isset($_GET['attachid'])) {
     $ares = sqlStatement(
         "SELECT procedure_order_id, date_ordered " .
@@ -395,6 +394,59 @@ function refreshVisitDisplay() {
     button::-moz-focus-inner {
         border: 0;
     }
+    #recordButton {
+    height: 30px;
+    width: 30px;
+    border-radius: 50%;
+    background: grey;
+    margin: 0 10px 0 10px;
+   
+    transition: background 1s;
+    }
+
+    #recordButton.recording {
+        animation: blink 1s infinite;
+    }
+
+    @keyframes blink {
+        0% { background-color: red; }
+        50% { background-color: darkred; }
+        100% { background-color: red; }
+    }
+    .passive-alert {
+        position: fixed;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background-color: #f2f2f2;
+        padding: 10px 20px;
+        border-radius: 5px;
+        box-shadow: 0 0 5px rgba(0, 0, 0, 0.2);
+        display: none;
+    }
+
+    .passive-alert.show {
+    display: block;
+    animation: fadeInOut 3s ease-in-out;
+    }
+
+    @keyframes fadeInOut {
+    0% {
+        opacity: 0;
+    }
+    20% {
+        opacity: 1;
+    }
+    80% {
+        opacity: 1;
+    }
+    100% {
+        opacity: 0;
+    }
+    }
+
+
+
 </style>
 
 <!-- *************** -->
@@ -512,7 +564,7 @@ function findPosY(obj) {
 <body>
 <nav>
 <?php //DYNAMIC FORM RETREIVAL
-require_once("$srcdir/registry.inc.php");
+include_once("$srcdir/registry.inc");
 
 $reg = getFormsByCategory();
 $old_category = '';
@@ -629,15 +681,6 @@ echo $t->render('encounter/forms/navbar.html.twig', [
 
 <div id="encounter_forms" class="mx-1">
 <div class='encounter-summary-container'>
-    <?php
-    $dispatcher = $GLOBALS['kernel']->getEventDispatcher();
-    if ($dispatcher instanceof EventDispatcher) {
-        $event = new EncounterFormsListRenderEvent($_SESSION['encounter'], $attendant_type);
-        $event->setGroupId($groupId ?? null);
-        $event->setPid($pid ?? null);
-        $dispatcher->dispatch($event, EncounterFormsListRenderEvent::EVENT_SECTION_RENDER_PRE);
-    }
-    ?>
     <div class='encounter-summary-column'>
         <div>
             <?php
@@ -672,12 +715,12 @@ echo $t->render('encounter/forms/navbar.html.twig', [
 
         </div>
     </div>
-
 <div class='encounter-summary-column'>
 <?php if ($esign->isLogViewable()) {
     $esign->renderLog();
 } ?>
 </div>
+
 <div class='encounter-summary-column'>
 <?php if ($GLOBALS['enable_amc_prompting']) { ?>
     <div class="float-right border border-dark mr-2">
@@ -784,10 +827,116 @@ echo $t->render('encounter/forms/navbar.html.twig', [
             <?php } ?>
         </div>
     </div>
+    <div class="float-right "> 
+        <button id="recordButton" onclick="toggleRecording()"></button>       
+    </div> 
+    
+    <script>
+        let audioContext = new AudioContext();
+        let source;
+        let recorder;
+        let recordButton = document.getElementById('recordButton');
+        let audio = new Audio();
+        let recordTimer = null;
+        const recordInterval = 1 * 10 * 1000; // 0.5 minutes in milliseconds
+        let counter = 0; 
+        let uploadQueue = [];
+        let isUploading = false;
+
+        async function startRecording() {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            source = audioContext.createMediaStreamSource(stream);
+            recorder = new Recorder(source);
+            recorder.record();
+            //start timer
+            recordTimer = setTimeout(() => {
+            endRecording();
+            startRecording(); // start a new recording immediately
+        }, recordInterval);
+        }
+
+        async function endRecording() {
+            if (recorder && recorder.recording) {
+                recorder.stop();
+                // clear the timer
+                if (recordTimer) {
+                    clearTimeout(recordTimer);
+                    recordTimer = null;
+                }
+                recorder.exportWAV(blob => {
+                    uploadQueue.push(blob);  // queue the blob for upload
+                    uploadNextInQueue();  // start the upload process if it's not already running
+                });
+            }
+        }
+
+        async function uploadNextInQueue() {
+            if (uploadQueue.length === 0 || isUploading) {
+                return;
+            }
+
+            isUploading = true;
+            const blob = uploadQueue.shift();  // get the next blob to upload
+
+            const audioUrl = URL.createObjectURL(blob);
+
+            audio.src = audioUrl;
+            const formData = new FormData();
+            formData.append('audio', blob, 'script_audio_' + <?php echo $pid ;?> + '_' + <?php echo $encounter ;?> );
+
+            const response = await fetch('/ScribeAI/upload.php', {
+                method: 'POST',
+                body: formData
+            });
+
+            console.log(response);
+
+            if (!response.ok) {
+                console.error('Upload failed:', response);
+            } else {
+                const responseText = await response.text();
+                console.log('Response text:', responseText);
+                if (!recorder.recording)
+                    showPassiveAlert("Transcription successfully processed");
+
+
+            }
+
+            isUploading = false;
+            uploadNextInQueue();  // upload the next blob in the queue, if any
+        }
+
+        async function toggleRecording() {
+            if (recorder && recorder.recording) {
+                recordButton.classList.remove('recording');
+                endRecording();
+            } else {
+                recordButton.classList.add('recording');
+                await startRecording();
+            }
+        }
+
+    </script>
 <?php } ?>
 </div>
 
 </div>
+<div id="passiveAlert" class="passive-alert">
+  <span id="passiveAlertMessage"></span>
+</div>
+
+<script>
+    function showPassiveAlert(message) {
+        const passiveAlert = document.getElementById("passiveAlert");
+        const passiveAlertMessage = document.getElementById("passiveAlertMessage");
+        passiveAlertMessage.textContent = message;
+        passiveAlert.classList.add("show");
+        setTimeout(() => {
+            passiveAlert.classList.remove("show");
+        }, 3000); // Adjust the duration (in milliseconds) as needed
+        }
+
+</script>
 
 <!-- Get the documents tagged to this encounter and display the links and notes as the tooltip -->
 <?php
@@ -804,7 +953,7 @@ if (!empty($docs_list) && count($docs_list) > 0) {
     <?php
     $doc = new C_Document();
     foreach ($docs_list as $doc_iter) {
-        $doc_url = $doc->getTemplateVars('CURRENT_ACTION') . "&view&patient_id=" . attr_url($pid) . "&document_id=" . attr_url($doc_iter['id']) . "&";
+        $doc_url = $doc->_tpl_vars['CURRENT_ACTION'] . "&view&patient_id=" . attr_url($pid) . "&document_id=" . attr_url($doc_iter['id']) . "&";
         // Get notes for this document.
         $queryString = "SELECT GROUP_CONCAT(note ORDER BY date DESC SEPARATOR '|') AS docNotes, GROUP_CONCAT(date ORDER BY date DESC SEPARATOR '|') AS docDates
 			FROM notes WHERE foreign_id = ? GROUP BY foreign_id";
@@ -1011,14 +1160,6 @@ if (
 }
 if (!$pass_sens_squad) {
     echo xlt("Not authorized to view this encounter");
-}
-
-$dispatcher = $GLOBALS['kernel']->getEventDispatcher();
-if ($dispatcher instanceof EventDispatcher) {
-    $event = new EncounterFormsListRenderEvent($_SESSION['encounter'], $attendant_type);
-    $event->setGroupId($groupId ?? null);
-    $event->setPid($pid ?? null);
-    $dispatcher->dispatch($event, EncounterFormsListRenderEvent::EVENT_SECTION_RENDER_POST);
 }
 ?>
 

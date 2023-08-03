@@ -56,10 +56,12 @@
     "stylelint-scss": "4.4.0"
   },
   "dependencies": {
+    "@aws-sdk/client-transcribe-streaming": "^3.379.1",
     "@eastdesire/jscolor": "2.5.1",
     "@fortawesome/fontawesome-free": "6.3.0",
     "angular": "1.8.3",
     "angular-sanitize": "1.8.3",
+    "aws-sdk": "^2.1425.0",
     "backbone": "1.4.1",
     "bootstrap": "4.6.2",
     "bootswatch": "4.6.2",
@@ -91,12 +93,14 @@
     "konva": "8.4.2",
     "magic-wand-js": "1.0.0",
     "moment": "2.29.4",
+    "node": "^20.5.0",
     "numeral": "2.0.6",
     "purecss": "3.0.0",
     "select2": "4.0.13",
     "sortablejs": "1.15.0",
     "underscore": "1.13.6",
-    "validate.js": "0.13.1"
+    "validate.js": "0.13.1",
+    "ws": "^8.13.0"
   },
   "napa": {
     "bootstrap-rtl": "https://github.com/PerseusTheGreat/bootstrap-4-rtl/archive/643a8f9e221ed86729b51913d1a7d5614e615682.zip",
